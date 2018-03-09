@@ -16,6 +16,8 @@ var (
 	Status        = ""
 	Label         = ""
 	MyClient      = github.NewClient(nil)
+	Own = ""
+	RP = ""
 )
 
 func init() {
@@ -26,11 +28,17 @@ func init() {
 	lbl := flag.String("lbl", "bug", "")
 	// статус задач
 	sts := flag.String("sts", "open", "")
+	// владелец
+	own := flag.String("own", "SArtemJ", "")
+	// repo
+	rp := flag.String("rp", "ADWtest", "")
 
 	flag.Parse()
 	PersonalToken = *tk
 	Status = *sts
 	Label = *lbl
+	Own = *own
+	RP = *rp
 }
 
 func main() {
@@ -52,7 +60,7 @@ func findIssues() {
 	//получаем все задачи из заданного репозитория
 	//владелец и репозиторий задан по умолчанию, можно также поменять при запуске
 
-	issues, _, err := MyClient.Issues.ListByRepo(context.Background(), "SArtemJ", "ADWtest", nil)
+	issues, _, err := MyClient.Issues.ListByRepo(context.Background(), Own, RP, nil)
 	if err != nil {
 		log.Panic("No issues in Repo")
 	}

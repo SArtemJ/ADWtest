@@ -6,7 +6,7 @@ import (
 	"log"
 )
 
-func test_access(t *testing.T) {
+func Testaccess(t *testing.T) {
 
 	PersonalToken = ""
 	access()
@@ -16,7 +16,7 @@ func test_access(t *testing.T) {
 
 }
 
-func test_findIssues(t *testing.T) {
+func TestfindIssues(t *testing.T) {
 
 	PersonalToken = "00afb866ab29487921c547e1e7e67df50c3274de"
 	access()
