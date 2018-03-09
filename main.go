@@ -23,7 +23,7 @@ var (
 func init() {
 	// ключи для запуска программы, необязательны
 	// токен пользователя
-	tk := flag.String("token", "", "")
+	tk := flag.String("token", "00afb866ab29487921c547e1e7e67df50c3274de", "")
 	// лэйбл для поиска задач
 	lbl := flag.String("lbl", "bug", "")
 	// статус задач
