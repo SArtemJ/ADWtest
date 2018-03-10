@@ -134,13 +134,14 @@ func checkIssues(in []personalIssue) []personalIssue {
 	for _, v := range in {
 		if v.Status == Status {
 			if checkLabels(v.Labels) {
+				//если задача подходит и по статусу и по лэйблу
 				t = append(t, v)
 			} else {
+				//если задача подходит только по статусу
 				t2 = append(t2, v)
 			}
 		}
 	}
-
 	if len(t) == 0 {
 		return t2
 	} else {
@@ -149,7 +150,7 @@ func checkIssues(in []personalIssue) []personalIssue {
 }
 
 //проверям задачу по лэйблу
-//елси находится хотя бы один совпадающий - задача подходит для вывода
+//если находится хотя бы один совпадающий - задача подходит для вывода
 func checkLabels(in []string) bool {
 	var t = false
 	for _, l := range in {
