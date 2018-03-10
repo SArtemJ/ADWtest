@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
+	"flag"
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
 	"html/template"
 	"log"
 	"net/http"
-	"flag"
+	"strings"
 )
 
 //структура задачи, только с нужными нам полями
@@ -27,9 +28,9 @@ var (
 	PersonalToken = ""
 	MyClient      = github.NewClient(nil)
 	tpl           *template.Template
-	Status        = "open"
-	Label         = "bug"
-	Repo = "ADWtest"
+	Status        = "all"
+	Label         = ""
+	Repo          = "ADWtest"
 )
 
 func init() {
@@ -50,7 +51,6 @@ func init() {
 	MyClient = github.NewClient(tokenClient)
 }
 
-
 func main() {
 
 	//запускаем сервис на 8000 порту
@@ -58,7 +58,6 @@ func main() {
 	http.HandleFunc("/", GetAllIssues)
 	http.ListenAndServe(":8000", nil)
 }
-
 
 func GetAllIssues(w http.ResponseWriter, r *http.Request) {
 
@@ -69,9 +68,15 @@ func GetAllIssues(w http.ResponseWriter, r *http.Request) {
 		defaultForm(w, r)
 	case "POST":
 		//когда отправляем данные с формы запускаем функцию отбора задач по критериям
-		Status = r.FormValue("statusI")
-		Label = r.FormValue("labelI")
-		Repo = r.FormValue("repoI")
+		if r.FormValue("statusI") != "" {
+			Status = r.FormValue("statusI")
+		}
+		if r.FormValue("labelI") != "" {
+			Label = r.FormValue("labelI")
+		}
+		if r.FormValue("repoI") != "" {
+			Repo = r.FormValue("repoI")
+		}
 		filteredForm(w, r)
 	}
 }
@@ -92,11 +97,13 @@ func filteredForm(w http.ResponseWriter, r *http.Request) {
 	tpl.ExecuteTemplate(w, "index.gohtml", result)
 }
 
-
 func createPersonalIssues() []personalIssue {
 
+	opt := &github.IssueListByRepoOptions{
+		State: Status,
+	}
 	//получаем все задачи
-	issues, _, err := MyClient.Issues.ListByRepo(context.Background(), "SArtemJ", Repo, nil)
+	issues, _, err := MyClient.Issues.ListByRepo(context.Background(), "SArtemJ", Repo, opt)
 	if err != nil {
 		log.Panic("No issues in Repo")
 	}
@@ -151,12 +158,16 @@ func checkIssues(in []personalIssue) []personalIssue {
 
 //проверям задачу по лэйблу
 //если находится хотя бы один совпадающий - задача подходит для вывода
+//для проверки полного совпадения лэйблов по условию И можно использовать reflect.DeepEqual(s1, s2)
 func checkLabels(in []string) bool {
+	newLabels := strings.Split(Label, ",")
 	var t = false
 	for _, l := range in {
-		if l == (Label) {
-			t = true
-			break
+		for _, ls := range newLabels {
+			if l == ls {
+				t = true
+				break
+			}
 		}
 	}
 	return t
