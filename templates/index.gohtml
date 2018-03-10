@@ -1,0 +1,21 @@
+{{template "header"}}
+
+<form method="POST">
+    <label for="statusI">Status</label>
+    <input type="text" id="statusI" name="statusI">
+    <br>
+    <label for="labelI">Labels</label>
+    <input type="text" id="labelI" name="labelI">
+    <br>
+    <input type="submit">
+</form>
+
+<br>
+<ul>
+   {{range .}}
+    <li>{{.ID}} - {{.Title}} - {{.Repo}} - {{.Assignee}} - {{.Labels}} - {{.Status}} </li>
+    {{end}}
+</ul>
+<br>
+
+{{template "footer"}}

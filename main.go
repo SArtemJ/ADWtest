@@ -2,52 +2,42 @@ package main
 
 import (
 	"context"
-	"flag"
-	"fmt"
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
+	"html/template"
 	"log"
+	"net/http"
+	"flag"
 )
 
-//"00afb866ab29487921c547e1e7e67df50c3274de"
+type personalIssue struct {
+	ID       int64
+	Title    string
+	Repo     string
+	Assignee string
+	Labels   []string
+	Status   string
+}
+
+//"e36cdea8137a975e1a67a0084b80eac079146fc8"
 
 var (
 	PersonalToken = ""
-	Status        = ""
-	Label         = ""
 	MyClient      = github.NewClient(nil)
-	Own = ""
-	RP = ""
+	tpl           *template.Template
+	Status        = "open"
+	Label         = "bug"
+	T []personalIssue
 )
 
 func init() {
-	// ключи для запуска программы, необязательны
-	// токен пользователя
-	tk := flag.String("token", "00afb866ab29487921c547e1e7e67df50c3274de", "")
-	// лэйбл для поиска задач
-	lbl := flag.String("lbl", "bug", "")
-	// статус задач
-	sts := flag.String("sts", "open", "")
-	// владелец
-	own := flag.String("own", "SArtemJ", "")
-	// repo
-	rp := flag.String("rp", "ADWtest", "")
 
+	tk := flag.String("token", "e36cdea8137a975e1a67a0084b80eac079146fc8", "")
 	flag.Parse()
 	PersonalToken = *tk
-	Status = *sts
-	Label = *lbl
-	Own = *own
-	RP = *rp
-}
 
-func main() {
-	access()
-	findIssues()
-}
+	tpl = template.Must(template.ParseGlob("templates/*"))
 
-func access() {
-	//Создаем нового клинета github c персональным токеном
 	tokenService := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: PersonalToken},
 	)
@@ -55,27 +45,105 @@ func access() {
 	MyClient = github.NewClient(tokenClient)
 }
 
-func findIssues() {
+func GetAllIssues(w http.ResponseWriter, r *http.Request) {
 
-	//получаем все задачи из заданного репозитория
-	//владелец и репозиторий задан по умолчанию, можно также поменять при запуске
+	switch r.Method {
+	case "GET":
+		defaultForm(w, r)
+	case "POST":
+		Status = r.FormValue("statusI")
+		Label = r.FormValue("labelI")
+		filteredForm(w, r)
+	}
+}
 
-	issues, _, err := MyClient.Issues.ListByRepo(context.Background(), Own, RP, nil)
+func defaultForm(w http.ResponseWriter, r *http.Request) {
+	issues, _, err := MyClient.Issues.ListByRepo(context.Background(), "SArtemJ", "ADWtest", nil)
 	if err != nil {
 		log.Panic("No issues in Repo")
 	}
-	for _, v := range issues {
 
-		var stringLabels = ""
-		for i := 0; i < len(v.Labels); i++ {
+	T = createPersonalIssues(issues)
+	tpl.ExecuteTemplate(w, "index.gohtml", T)
+}
 
-			// проверям чтобы статус задачи и лэйбл соответствовали ключам при запуске программы иначе ключи по умолчанию
-			if *v.State == Status && *v.Labels[i].Name == Label {
-				for _, k := range v.Labels {
-					stringLabels = stringLabels + *k.Name
-				}
-				fmt.Printf("ID %v Title %v Repo %v Assignee %v Owner _ Labels %v Status %v \n", *v.ID, *v.Title, *v.RepositoryURL, *v.Assignee.Login, stringLabels, *v.State)
+func filteredForm(w http.ResponseWriter, r *http.Request) {
+	//issues, _, err := MyClient.Issues.ListByRepo(context.Background(), "SArtemJ", "ADWtest", nil)
+	//if err != nil {
+	//	//log.Panic("No issues in Repo")
+	//}
+
+	result := checkIssues(T)
+	tpl.ExecuteTemplate(w, "index.gohtml", result)
+}
+
+func main() {
+
+	http.HandleFunc("/", GetAllIssues)
+	http.ListenAndServe(":8000", nil)
+}
+
+
+func createSliceLabel(in github.Issue) []string {
+
+	var sL []string
+	for _, l := range in.Labels {
+		sL = append(sL, *l.Name)
+	}
+
+	return sL
+
+}
+
+
+func createPersonalIssues(in []*github.Issue) []personalIssue {
+
+	var slicePI []personalIssue
+	for _, i := range in {
+		pI := &personalIssue{
+			ID:       *i.ID,
+			Title:    *i.Title,
+			Repo:     *i.RepositoryURL,
+			Assignee: *i.Assignee.Login,
+			Labels:   createSliceLabel(*i),
+			Status:   *i.State,
+		}
+		slicePI = append(slicePI, *pI)
+	}
+
+	return slicePI
+}
+
+
+func checkIssues(in []personalIssue) []personalIssue {
+
+	var t []personalIssue
+	var t2 []personalIssue
+	for _, v := range in {
+		if v.Status == Status {
+			if checkLabels(v.Labels) {
+				t = append(t, v)
+			} else {
+				t2 = append(t2, v)
 			}
 		}
 	}
+
+	if len(t) == 0 {
+		return t2
+	} else {
+		return t
+	}
+}
+
+func checkLabels(in []string) bool {
+	var t = false
+	for _, l := range in {
+		log.Println(Label)
+		if l == (Label) {
+			t = true
+			break
+		}
+	}
+	return t
 }
