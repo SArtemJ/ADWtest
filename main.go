@@ -10,6 +10,7 @@ import (
 	"flag"
 )
 
+//структура задачи, только с нужными нам полями
 type personalIssue struct {
 	ID       int64
 	Title    string
@@ -19,25 +20,29 @@ type personalIssue struct {
 	Status   string
 }
 
-//"e36cdea8137a975e1a67a0084b80eac079146fc8"
+//
 
+//глобальные переменные
 var (
 	PersonalToken = ""
 	MyClient      = github.NewClient(nil)
 	tpl           *template.Template
 	Status        = "open"
 	Label         = "bug"
-	T []personalIssue
+	Repo = "ADWtest"
 )
 
 func init() {
 
-	tk := flag.String("token", "e36cdea8137a975e1a67a0084b80eac079146fc8", "")
+	//параметр ключа можно задавать при запуске, если не указываем используется ключ по умолчанию
+	tk := flag.String("token", "", "")
 	flag.Parse()
 	PersonalToken = *tk
 
+	//используемые шаблоны веб страниц
 	tpl = template.Must(template.ParseGlob("templates/*"))
 
+	//создаем нового клиента github с персональным токеном
 	tokenService := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: PersonalToken},
 	)
@@ -45,61 +50,59 @@ func init() {
 	MyClient = github.NewClient(tokenClient)
 }
 
-func GetAllIssues(w http.ResponseWriter, r *http.Request) {
-
-	switch r.Method {
-	case "GET":
-		defaultForm(w, r)
-	case "POST":
-		Status = r.FormValue("statusI")
-		Label = r.FormValue("labelI")
-		filteredForm(w, r)
-	}
-}
-
-func defaultForm(w http.ResponseWriter, r *http.Request) {
-	issues, _, err := MyClient.Issues.ListByRepo(context.Background(), "SArtemJ", "ADWtest", nil)
-	if err != nil {
-		log.Panic("No issues in Repo")
-	}
-
-	T = createPersonalIssues(issues)
-	tpl.ExecuteTemplate(w, "index.gohtml", T)
-}
-
-func filteredForm(w http.ResponseWriter, r *http.Request) {
-	//issues, _, err := MyClient.Issues.ListByRepo(context.Background(), "SArtemJ", "ADWtest", nil)
-	//if err != nil {
-	//	//log.Panic("No issues in Repo")
-	//}
-
-	result := checkIssues(T)
-	tpl.ExecuteTemplate(w, "index.gohtml", result)
-}
 
 func main() {
 
+	//запускаем сервис на 8000 порту
+	//так как страница только одна сперва вызывается функция получения задач - базовая
 	http.HandleFunc("/", GetAllIssues)
 	http.ListenAndServe(":8000", nil)
 }
 
 
-func createSliceLabel(in github.Issue) []string {
+func GetAllIssues(w http.ResponseWriter, r *http.Request) {
 
-	var sL []string
-	for _, l := range in.Labels {
-		sL = append(sL, *l.Name)
+	//следим за тем, какие методы выполняются на форме
+	switch r.Method {
+	case "GET":
+		//по умолчанию получаем все задачи с заданными параметрами по умолчниаю open / bug
+		defaultForm(w, r)
+	case "POST":
+		//когда отправляем данные с формы запускаем функцию отбора задач по критериям
+		Status = r.FormValue("statusI")
+		Label = r.FormValue("labelI")
+		Repo = r.FormValue("repoI")
+		filteredForm(w, r)
 	}
+}
 
-	return sL
+func defaultForm(w http.ResponseWriter, r *http.Request) {
 
+	//получаем задачи и переводим в удобную нам структуру
+	t := createPersonalIssues()
+	//передаем структуру в шаблон для отображения
+	tpl.ExecuteTemplate(w, "index.gohtml", t)
+}
+
+func filteredForm(w http.ResponseWriter, r *http.Request) {
+
+	t := createPersonalIssues()
+	//Полученные задачи на этапе старта сервиса проверяем по условиям
+	result := checkIssues(t)
+	tpl.ExecuteTemplate(w, "index.gohtml", result)
 }
 
 
-func createPersonalIssues(in []*github.Issue) []personalIssue {
+func createPersonalIssues() []personalIssue {
+
+	//получаем все задачи
+	issues, _, err := MyClient.Issues.ListByRepo(context.Background(), "SArtemJ", Repo, nil)
+	if err != nil {
+		log.Panic("No issues in Repo")
+	}
 
 	var slicePI []personalIssue
-	for _, i := range in {
+	for _, i := range issues {
 		pI := &personalIssue{
 			ID:       *i.ID,
 			Title:    *i.Title,
@@ -114,7 +117,16 @@ func createPersonalIssues(in []*github.Issue) []personalIssue {
 	return slicePI
 }
 
+//так как у задачи может быть несколько лэйблов создаем удобную структуру
+func createSliceLabel(in github.Issue) []string {
+	var sL []string
+	for _, l := range in.Labels {
+		sL = append(sL, *l.Name)
+	}
+	return sL
+}
 
+//проверям задачи по статусу
 func checkIssues(in []personalIssue) []personalIssue {
 
 	var t []personalIssue
@@ -136,6 +148,8 @@ func checkIssues(in []personalIssue) []personalIssue {
 	}
 }
 
+//проверям задачу по лэйблу
+//елси находится хотя бы один совпадающий - задача подходит для вывода
 func checkLabels(in []string) bool {
 	var t = false
 	for _, l := range in {
