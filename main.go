@@ -153,7 +153,6 @@ func checkIssues(in []personalIssue) []personalIssue {
 func checkLabels(in []string) bool {
 	var t = false
 	for _, l := range in {
-		log.Println(Label)
 		if l == (Label) {
 			t = true
 			break
