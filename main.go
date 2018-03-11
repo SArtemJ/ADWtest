@@ -12,7 +12,7 @@ import (
 )
 
 //структура задачи, только с нужными нам полями
-type personalIssue struct {
+type PersonalIssue struct {
 	ID       int64
 	Title    string
 	Repo     string
@@ -97,7 +97,7 @@ func filteredForm(w http.ResponseWriter, r *http.Request) {
 	tpl.ExecuteTemplate(w, "index.gohtml", result)
 }
 
-func createPersonalIssues() []personalIssue {
+func createPersonalIssues() []PersonalIssue {
 
 	opt := &github.IssueListByRepoOptions{
 		State: Status,
@@ -108,9 +108,9 @@ func createPersonalIssues() []personalIssue {
 		log.Panic("No issues in Repo")
 	}
 
-	var slicePI []personalIssue
+	var slicePI []PersonalIssue
 	for _, i := range issues {
-		pI := &personalIssue{
+		pI := &PersonalIssue{
 			ID:       *i.ID,
 			Title:    *i.Title,
 			Repo:     *i.RepositoryURL,
@@ -134,10 +134,10 @@ func createSliceLabel(in github.Issue) []string {
 }
 
 //проверям задачи по статусу
-func checkIssues(in []personalIssue) []personalIssue {
+func checkIssues(in []PersonalIssue) []PersonalIssue {
 
-	var t []personalIssue
-	var t2 []personalIssue
+	var t []PersonalIssue
+	var t2 []PersonalIssue
 	for _, v := range in {
 		if v.Status == Status {
 			if checkLabels(v.Labels) {

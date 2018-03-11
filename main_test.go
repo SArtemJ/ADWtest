@@ -3,6 +3,18 @@ package main
 import (
 	"testing"
 	"net/http"
+	"log"
+	"net/http/httptest"
+	"github.com/google/go-github/github"
+	"fmt"
+	"io/ioutil"
+	"net/url"
+	"context"
+	"strings"
+)
+
+var (srv *httptest.Server
+	 slicePITest []PersonalIssue
 )
 
 func Test_init(t *testing.T) {
@@ -18,17 +30,125 @@ func Test_init(t *testing.T) {
 
 func Test_main(t *testing.T) {
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r* http.Request) {
-		tpl.ExecuteTemplate(w, "index.gohtml", r)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Hello, client")
+	}))
+	defer srv.Close()
 
-		res, _ := http.Get("http://localhost:8000")
-		if res.StatusCode != 200 {
-			t.Errorf("Can't connect to localhost on port 8000")
+	res, err := http.Get(srv.URL)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	value, err := ioutil.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("%s", value)
+}
+
+func Test_GetAllIssues(t *testing.T) {
+
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request){
+
+			req, err := http.Get("http://localhost:8000")
+			if err != nil {
+				t.Errorf("No request result status %v", req.Status)
+			}
+
+
+			req, err = http.PostForm("http://localhost:8000", url.Values{"statusI": { "testS" }, "labelI": { "testL" }, "repoI": { "testR" }})
+			if err != nil {
+				t.Errorf("Bad param to form %v %v %v %v", r.FormValue("statusI"), r.FormValue("labelI"), r.FormValue("repoI"), req.Status)
+			}
+
+		})
+
+}
+
+func Test_createPersonalIssues(t *testing.T) {
+
+	opt := &github.IssueListByRepoOptions{
+		State: Status,
+	}
+
+	issues, _, err := MyClient.Issues.ListByRepo(context.Background(), "SArtemJ", Repo, opt)
+	if err != nil {
+		t.Errorf("No issues in Repo")
+	}
+
+	for _, i := range issues {
+		pI := &PersonalIssue{
+			ID:       *i.ID,
+			Title:    *i.Title,
+			Repo:     *i.RepositoryURL,
+			Assignee: *i.Assignee.Login,
+			Labels:   createSliceLabel(*i),
+			Status:   *i.State,
 		}
+		slicePITest = append(slicePITest, *pI)
+	}
 
-	})
+	if len(slicePITest) == 0 {
+		t.Errorf("No issues in Repo len of personal slice %v", len(slicePITest))
+	}
+
 
 }
 
 
+func Test_createSliceLabel(t *testing.T) {
+	var sL []string
+	testLabel := []string{"test1", "test2"}
+	for _, l := range testLabel {
+		sL = append(sL, l)
+	}
 
+	if len(sL) == 0 {
+		t.Errorf("Create slice of labels - error - zero len slice %v", len(sL))
+	}
+}
+
+func Test_checkIssues(t *testing.T) {
+
+	var testSlicePIssues []PersonalIssue
+	for  _, v := range slicePITest {
+		Status = "open"
+		if v.Status == Status {
+			testSlicePIssues = append(testSlicePIssues, v)
+		}
+	}
+
+	if len(testSlicePIssues) == 0 {
+		t.Errorf("Check issues on ststus- error - zero len slice %v", len(testSlicePIssues))
+	}
+
+}
+
+func Test_checkLabels(t *testing.T) {
+	Label = "bug,invalid"
+	newLabels := strings.Split(Label, ",")
+
+	if len(newLabels) == 0 {
+		t.Errorf("Check labels - error - no parse values to slice")
+	}
+
+	var res = false
+	for _, l := range slicePITest {
+		for _, ls := range l.Labels {
+			for _, lstest := range newLabels{
+				if ls == lstest {
+					res = true
+					break
+				}
+			}
+		}
+	}
+
+	if res == false {
+		t.Errorf("Bad value for check labels")
+	}
+
+}
