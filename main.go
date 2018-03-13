@@ -102,7 +102,7 @@ func defaultForm(w http.ResponseWriter, r *http.Request) {
 
 func createPersonalIssues() []PersonalIssue {
 
-	//опциональный параметр библиотеки позволяет отобрать задачи с заданным статусом и лйэблами
+	//опциональный параметр библиотеки позволяет отобрать задачи с заданным статусом и лэйблами
 	opt := &github.IssueListByRepoOptions{
 		State:  Status,
 		Labels: Label,
@@ -122,7 +122,7 @@ func createPersonalIssues() []PersonalIssue {
 			Title:    *i.Title,
 			Repo:     *i.RepositoryURL,
 			Assignee: *i.Assignee.Login,
-			//так как объет label с несколькими полями, нас интересует только имя лэйбда
+			//так как объект label с несколькими полями, нас интересует только имя лэйбла
 			Labels: createSliceLabel(*i),
 			Status: *i.State,
 		}
