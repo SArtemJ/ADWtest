@@ -25,12 +25,18 @@ type PersonalIssue struct {
 
 //глобальные переменные
 var (
+	//token
 	PersonalToken = ""
-	MyClient      = github.NewClient(nil)
-	tpl           *template.Template
-	Status        = "all"
-	Label         = ""
-	Repo          = "ADWtest"
+	//client github
+	MyClient = github.NewClient(nil)
+	//html templates
+	tpl *template.Template
+	// status for issues
+	Status = "all"
+	//labels issues
+	Label = []string{}
+	//repo issues
+	Repo = "ADWtest"
 )
 
 func init() {
@@ -49,6 +55,8 @@ func init() {
 	)
 	tokenClient := oauth2.NewClient(context.Background(), tokenService)
 	MyClient = github.NewClient(tokenClient)
+
+	Label = nil
 }
 
 func main() {
@@ -61,23 +69,26 @@ func main() {
 
 func GetAllIssues(w http.ResponseWriter, r *http.Request) {
 
-	//следим за тем, какие методы выполняются на форме
+	//следим за тем, какие методы выполняются
 	switch r.Method {
 	case "GET":
-		//по умолчанию получаем все задачи с заданными параметрами по умолчниаю open / bug
+		//по умолчанию получаем все задачи с заданными параметрами по умолчниаю all / all
 		defaultForm(w, r)
 	case "POST":
 		//когда отправляем данные с формы запускаем функцию отбора задач по критериям
 		if r.FormValue("statusI") != "" {
 			Status = r.FormValue("statusI")
-		}
+		} else {Status = "all"}
 		if r.FormValue("labelI") != "" {
-			Label = r.FormValue("labelI")
-		}
+			Label = nil
+			//так как лэйблов может быть несколько, сначала обнуляем слайс
+			// и заполняем значениями из формы
+			Label = strings.Split(r.FormValue("labelI"), ",")
+		} else {Label = nil}
 		if r.FormValue("repoI") != "" {
 			Repo = r.FormValue("repoI")
 		}
-		filteredForm(w, r)
+		defaultForm(w, r)
 	}
 }
 
@@ -89,25 +100,21 @@ func defaultForm(w http.ResponseWriter, r *http.Request) {
 	tpl.ExecuteTemplate(w, "index.gohtml", t)
 }
 
-func filteredForm(w http.ResponseWriter, r *http.Request) {
-
-	t := createPersonalIssues()
-	//Полученные задачи на этапе старта сервиса проверяем по условиям
-	result := checkIssues(t)
-	tpl.ExecuteTemplate(w, "index.gohtml", result)
-}
-
 func createPersonalIssues() []PersonalIssue {
 
+	//опциональный параметр библиотеки позволяет отобрать задачи с заданным статусом и лйэблами
 	opt := &github.IssueListByRepoOptions{
-		State: Status,
+		State:  Status,
+		Labels: Label,
 	}
+
 	//получаем все задачи
 	issues, _, err := MyClient.Issues.ListByRepo(context.Background(), "SArtemJ", Repo, opt)
 	if err != nil {
 		log.Panic("No issues in Repo")
 	}
 
+	//для отображения перепишем в удобный слайс
 	var slicePI []PersonalIssue
 	for _, i := range issues {
 		pI := &PersonalIssue{
@@ -115,8 +122,9 @@ func createPersonalIssues() []PersonalIssue {
 			Title:    *i.Title,
 			Repo:     *i.RepositoryURL,
 			Assignee: *i.Assignee.Login,
-			Labels:   createSliceLabel(*i),
-			Status:   *i.State,
+			//так как объет label с несколькими полями, нас интересует только имя лэйбда
+			Labels: createSliceLabel(*i),
+			Status: *i.State,
 		}
 		slicePI = append(slicePI, *pI)
 	}
@@ -125,6 +133,7 @@ func createPersonalIssues() []PersonalIssue {
 }
 
 //так как у задачи может быть несколько лэйблов создаем удобную структуру
+// получаем только имена лэйблов
 func createSliceLabel(in github.Issue) []string {
 	var sL []string
 	for _, l := range in.Labels {
@@ -133,42 +142,3 @@ func createSliceLabel(in github.Issue) []string {
 	return sL
 }
 
-//проверям задачи по статусу
-func checkIssues(in []PersonalIssue) []PersonalIssue {
-
-	var t []PersonalIssue
-	var t2 []PersonalIssue
-	for _, v := range in {
-		if v.Status == Status {
-			if checkLabels(v.Labels) {
-				//если задача подходит и по статусу и по лэйблу
-				t = append(t, v)
-			} else {
-				//если задача подходит только по статусу
-				t2 = append(t2, v)
-			}
-		}
-	}
-	if len(t) == 0 {
-		return t2
-	} else {
-		return t
-	}
-}
-
-//проверям задачу по лэйблу
-//если находится хотя бы один совпадающий - задача подходит для вывода
-//для проверки полного совпадения лэйблов по условию И можно использовать reflect.DeepEqual(s1, s2)
-func checkLabels(in []string) bool {
-	newLabels := strings.Split(Label, ",")
-	var t = false
-	for _, l := range in {
-		for _, ls := range newLabels {
-			if l == ls {
-				t = true
-				break
-			}
-		}
-	}
-	return t
-}

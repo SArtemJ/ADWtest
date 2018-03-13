@@ -1,20 +1,20 @@
 package main
 
 import (
-	"testing"
-	"net/http"
-	"log"
-	"net/http/httptest"
-	"github.com/google/go-github/github"
-	"fmt"
-	"io/ioutil"
-	"net/url"
 	"context"
-	"strings"
+	"fmt"
+	"github.com/google/go-github/github"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"testing"
 )
 
-var (srv *httptest.Server
-	 slicePITest []PersonalIssue
+var (
+	srv         *httptest.Server
+	slicePITest []PersonalIssue
 )
 
 func Test_init(t *testing.T) {
@@ -51,20 +51,19 @@ func Test_main(t *testing.T) {
 
 func Test_GetAllIssues(t *testing.T) {
 
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request){
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
-			req, err := http.Get("http://localhost:8000")
-			if err != nil {
-				t.Errorf("No request result status %v", req.Status)
-			}
+		req, err := http.Get("http://localhost:8000")
+		if err != nil {
+			t.Errorf("No request result status %v", req.Status)
+		}
 
+		req, err = http.PostForm("http://localhost:8000", url.Values{"statusI": {"testS"}, "labelI": {"testL"}, "repoI": {"testR"}})
+		if err != nil {
+			t.Errorf("Bad param to form %v %v %v %v", r.FormValue("statusI"), r.FormValue("labelI"), r.FormValue("repoI"), req.Status)
+		}
 
-			req, err = http.PostForm("http://localhost:8000", url.Values{"statusI": { "testS" }, "labelI": { "testL" }, "repoI": { "testR" }})
-			if err != nil {
-				t.Errorf("Bad param to form %v %v %v %v", r.FormValue("statusI"), r.FormValue("labelI"), r.FormValue("repoI"), req.Status)
-			}
-
-		})
+	})
 
 }
 
@@ -72,6 +71,7 @@ func Test_createPersonalIssues(t *testing.T) {
 
 	opt := &github.IssueListByRepoOptions{
 		State: Status,
+		Labels: Label,
 	}
 
 	issues, _, err := MyClient.Issues.ListByRepo(context.Background(), "SArtemJ", Repo, opt)
@@ -95,9 +95,7 @@ func Test_createPersonalIssues(t *testing.T) {
 		t.Errorf("No issues in Repo len of personal slice %v", len(slicePITest))
 	}
 
-
 }
-
 
 func Test_createSliceLabel(t *testing.T) {
 	var sL []string
@@ -109,46 +107,4 @@ func Test_createSliceLabel(t *testing.T) {
 	if len(sL) == 0 {
 		t.Errorf("Create slice of labels - error - zero len slice %v", len(sL))
 	}
-}
-
-func Test_checkIssues(t *testing.T) {
-
-	var testSlicePIssues []PersonalIssue
-	for  _, v := range slicePITest {
-		Status = "open"
-		if v.Status == Status {
-			testSlicePIssues = append(testSlicePIssues, v)
-		}
-	}
-
-	if len(testSlicePIssues) == 0 {
-		t.Errorf("Check issues on ststus- error - zero len slice %v", len(testSlicePIssues))
-	}
-
-}
-
-func Test_checkLabels(t *testing.T) {
-	Label = "bug,invalid"
-	newLabels := strings.Split(Label, ",")
-
-	if len(newLabels) == 0 {
-		t.Errorf("Check labels - error - no parse values to slice")
-	}
-
-	var res = false
-	for _, l := range slicePITest {
-		for _, ls := range l.Labels {
-			for _, lstest := range newLabels{
-				if ls == lstest {
-					res = true
-					break
-				}
-			}
-		}
-	}
-
-	if res == false {
-		t.Errorf("Bad value for check labels")
-	}
-
 }
